@@ -1,4 +1,4 @@
-import { memo, useCallback, useEffect, useMemo, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Background,
   Controls,
@@ -33,8 +33,8 @@ const GROUP_KIND = { key: "group", label: "기능 묶음", color: "#334155" };
 const KIND = { ...Object.fromEntries(KINDS.map((k) => [k.key, k])), group: GROUP_KIND } as unknown as Record<FlowKind | "group", { label: string; color: string }>;
 type ViewNode = Omit<FlowNode, "kind"> & { kind: FlowKind | "group"; groupKey?: string; count?: number };
 
-const NODE_W = 230;
-const NODE_H = 58;
+const NODE_W = 250;
+const NODE_H = 68;
 
 type NodeData = {
   n: ViewNode;
@@ -42,10 +42,11 @@ type NodeData = {
   selected: boolean;
   other: boolean; // 다른 프로젝트 노드 (프로젝트 화면에서)
   showProject: boolean;
+  vertical: boolean; // 위→아래 배치
 };
 
 const ClassNode = memo(function ClassNode({ data }: NodeProps<Node<NodeData>>) {
-  const { n, dim, selected, other, showProject } = data;
+  const { n, dim, selected, other, showProject, vertical } = data;
   const k = KIND[n.kind];
   return (
     <div
@@ -53,7 +54,7 @@ const ClassNode = memo(function ClassNode({ data }: NodeProps<Node<NodeData>>) {
       style={{ borderLeftColor: k.color, opacity: dim ? 0.18 : 1 }}
       title={n.desc ?? n.label}
     >
-      <Handle type="target" position={Position.Left} />
+      <Handle type="target" position={vertical ? Position.Top : Position.Left} />
       <div className="fnode-top">
         <span className="fnode-kind" style={{ color: k.color }}>
           {k.label}
@@ -66,7 +67,7 @@ const ClassNode = memo(function ClassNode({ data }: NodeProps<Node<NodeData>>) {
       <div className="fnode-label">{n.label}</div>
       {n.desc && <div className="fnode-desc">{n.desc}</div>}
       {n.kind === "group" && <div className="fnode-desc">{n.count}개 · 눌러서 펼치기</div>}
-      <Handle type="source" position={Position.Right} />
+      <Handle type="source" position={vertical ? Position.Bottom : Position.Right} />
     </div>
   );
 });
@@ -97,9 +98,13 @@ function collapse(g: FlowGraph, visible: (n: FlowNode) => boolean) {
   return { nodes: g.nodes.filter((n) => keep.has(n.id)), edges: [...edges.entries()].map(([id, e]) => ({ id, ...e })) };
 }
 
-function layout(nodes: { id: string }[], edges: { source: string; target: string }[]) {
+function layout(nodes: { id: string }[], edges: { source: string; target: string }[], vertical = false) {
   const g = new dagre.graphlib.Graph();
-  g.setGraph({ rankdir: "LR", nodesep: 12, ranksep: 70, marginx: 20, marginy: 20 });
+  g.setGraph(
+    vertical
+      ? { rankdir: "TB", nodesep: 24, ranksep: 46, marginx: 20, marginy: 20 }
+      : { rankdir: "LR", nodesep: 12, ranksep: 70, marginx: 20, marginy: 20 },
+  );
   g.setDefaultEdgeLabel(() => ({}));
   for (const n of nodes) g.setNode(n.id, { width: NODE_W, height: NODE_H });
   for (const e of edges) g.setEdge(e.source, e.target);
@@ -186,6 +191,8 @@ export default function FlowPanel(props: Props) {
 }
 
 const DEFAULT_HIDDEN: FlowKind[] = [];
+// 흐름을 고를 때 시작점이 되는 종류 (왼쪽 목록)
+const START_KINDS: FlowKind[] = ["screen", "api", "controller", "client", "scheduler"];
 
 function FlowInner({ projectId, hasApiKey, onOpen }: Props) {
   const all = projectId == null;
@@ -206,8 +213,11 @@ function FlowInner({ projectId, hasApiKey, onOpen }: Props) {
   const [focusRoot, setFocusRoot] = useState<string | null>(null);
   const focus = !!focusRoot;
   const [grouped, setGrouped] = useState(projectId == null);
+  const [mode, setMode] = useState<"flow" | "all">("flow");
+  const flowMode = mode === "flow";
   const [describing, setDescribing] = useState("");
   const rf = useReactFlow();
+  const canvasRef = useRef<HTMLDivElement>(null);
 
   const url = all ? "/api/flow" : `/api/projects/${projectId}/flow`;
   const load = useCallback(
@@ -227,6 +237,7 @@ function FlowInner({ projectId, hasApiKey, onOpen }: Props) {
 
   useEffect(() => {
     setSelected(null);
+    setFocusRoot(null);
     setGroup("");
     load();
   }, [load]);
@@ -247,10 +258,54 @@ function FlowInner({ projectId, hasApiKey, onOpen }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [graph, all, projectId]);
 
+  // 왼쪽 목록: 흐름 시작점 (기능별)
+  const starts = useMemo(() => {
+    if (!graph) return [];
+    const list = graph.nodes.filter(
+      (n) => (all ? n.projectId != null : n.projectId === projectId) && (START_KINDS.includes(n.kind) || n.scheduled) && !hidden.has(n.kind),
+    );
+    const order = (n: FlowNode) => START_KINDS.indexOf(n.kind);
+    const byGroup = new Map<string, FlowNode[]>();
+    for (const n of list) byGroup.set(groupKey(n), [...(byGroup.get(groupKey(n)) ?? []), n]);
+    return [...byGroup.entries()]
+      .sort((a, b) => a[0].localeCompare(b[0]))
+      .map(([g, ns]) => ({ group: g, nodes: ns.sort((a, b) => order(a) - order(b) || a.label.localeCompare(b.label)) }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [graph, all, projectId, hidden]);
+
+  const listQuery = q.trim().toLowerCase();
+  const startsShown = useMemo(() => {
+    if (!listQuery) return starts;
+    const hit = (n: FlowNode) =>
+      [n.label, n.desc, n.file, ...(n.endpoints ?? []).map((e) => e.path), ...(n.calls ?? []).map((c) => c.url)].some((x) => x?.toLowerCase().includes(listQuery));
+    return starts.map((g) => ({ ...g, nodes: g.group.toLowerCase().includes(listQuery) ? g.nodes : g.nodes.filter(hit) })).filter((g) => g.nodes.length);
+  }, [starts, listQuery]);
+
+  // 선택 흐름 화면: 처음엔 첫 Controller(없으면 첫 항목)를 고른다
+  useEffect(() => {
+    if (!flowMode || !graph || (focusRoot && graph.nodes.some((n) => n.id === focusRoot))) return;
+    const flat = starts.flatMap((g) => g.nodes);
+    const first = flat.find((n) => n.kind === "controller" && n.endpoints?.length) ?? flat[0];
+    if (first) {
+      setFocusRoot(first.id);
+      setSelected(first.id);
+    }
+  }, [flowMode, graph, starts, focusRoot]);
+
+  const pick = (id: string) => {
+    setFocusRoot(id);
+    setSelected(id);
+  };
+
   // 보이는 노드·연결
   const view = useMemo((): { nodes: ViewNode[]; edges: { id: string; source: string; target: string; label?: string; cross?: boolean }[] } | null => {
     if (!graph) return null;
     let g = collapse(graph, (n) => !hidden.has(n.kind));
+    if (flowMode) {
+      if (!focusRoot || !g.nodes.some((n) => n.id === focusRoot)) return { nodes: [], edges: [] };
+      const chain = chainOf(focusRoot, g.edges);
+      return { nodes: g.nodes.filter((n) => chain.has(n.id)), edges: g.edges.filter((e) => chain.has(e.source) && chain.has(e.target)) };
+    }
     if (grouped && !group) return groupUp(g, (n) => `${n.project} / ${n.group ?? ""}`);
     if (group) {
       // 선택한 묶음 + 바로 연결된 노드
@@ -268,19 +323,20 @@ function FlowInner({ projectId, hasApiKey, onOpen }: Props) {
     }
     return g;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [graph, hidden, group, focusRoot, grouped]);
+  }, [graph, hidden, group, focusRoot, grouped, flowMode]);
 
-  const positions = useMemo(() => (view ? layout(view.nodes, view.edges) : new Map()), [view]);
+  // 선택 흐름은 위에서 아래로, 전체 보기는 왼쪽에서 오른쪽으로
+  const positions = useMemo(() => (view ? layout(view.nodes, view.edges, flowMode) : new Map()), [view, flowMode]);
 
   const query = q.trim().toLowerCase();
   const matches = useMemo(() => {
-    if (!view || !query) return null;
+    if (!view || !query || flowMode) return null;
     return new Set(
       view.nodes
         .filter((n) => [n.label, n.desc, n.file, ...(n.endpoints ?? []).map((e) => e.path), ...(n.calls ?? []).map((c) => c.url)].some((x) => x?.toLowerCase().includes(query)))
         .map((n) => n.id),
     );
-  }, [view, query]);
+  }, [view, query, flowMode]);
 
   const chain = useMemo(() => (view && selected ? chainOf(selected, view.edges) : null), [view, selected]);
 
@@ -298,10 +354,11 @@ function FlowInner({ projectId, hasApiKey, onOpen }: Props) {
           dim: matches ? !matches.has(n.id) : chain ? !chain.has(n.id) : false,
           other: !all && n.projectId != null && n.projectId !== projectId,
           showProject: all || n.kind === "group",
+          vertical: flowMode,
         },
         draggable: true,
       })),
-    [view, positions, selected, matches, chain, all, projectId],
+    [view, positions, selected, matches, chain, all, projectId, flowMode],
   );
 
   const rfEdges: Edge[] = useMemo(
@@ -336,9 +393,27 @@ function FlowInner({ projectId, hasApiKey, onOpen }: Props) {
   }, [matches, rf]);
 
   useEffect(() => {
-    const t = setTimeout(() => rf.fitView({ duration: 200, maxZoom: 1.3, padding: 0.06 }), 50);
+    const t = setTimeout(() => {
+      const box = canvasRef.current;
+      if (!flowMode || !box || !positions.size) return rf.fitView({ duration: 200, maxZoom: 1.3, padding: 0.06 });
+      // 선택 흐름: 글씨가 읽히는 크기(75%) 아래로는 줄이지 않고, 흐름이 길면 맨 위(시작)부터 보여준다
+      const ps = [...positions.values()];
+      const minX = Math.min(...ps.map((p) => p.x));
+      const maxX = Math.max(...ps.map((p) => p.x)) + NODE_W;
+      const minY = Math.min(...ps.map((p) => p.y));
+      const maxY = Math.max(...ps.map((p) => p.y)) + NODE_H;
+      const pad = 40;
+      const fit = Math.min(1.15, (box.clientWidth - pad) / (maxX - minX), (box.clientHeight - pad) / (maxY - minY));
+      const zoom = Math.max(0.75, fit);
+      const root = (focusRoot && positions.get(focusRoot)) || ps[0];
+      const cx = fit >= 0.75 ? (minX + maxX) / 2 : root.x + NODE_W / 2;
+      const x = box.clientWidth / 2 - cx * zoom;
+      const y = fit >= 0.75 ? box.clientHeight / 2 - ((minY + maxY) / 2) * zoom : pad / 2 - minY * zoom;
+      rf.setViewport({ x, y, zoom }, { duration: 200 });
+    }, 50);
     return () => clearTimeout(t);
-  }, [view, rf]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [view, positions, rf, flowMode]);
 
   const sel = graph?.nodes.find((n) => n.id === selected) ?? null;
   const drill = (n: ViewNode) => {
@@ -384,7 +459,23 @@ function FlowInner({ projectId, hasApiKey, onOpen }: Props) {
   return (
     <div className="flow">
       <div className="flow-bar">
-        <input placeholder="클래스 · 주소 · 파일 찾기" value={q} onChange={(e) => setQ(e.target.value)} style={{ width: 220 }} />
+        <div className="seg">
+          <button className={flowMode ? "on" : ""} onClick={() => setMode("flow")}>
+            선택 흐름
+          </button>
+          <button
+            className={!flowMode ? "on" : ""}
+            onClick={() => {
+              setMode("all");
+              setFocusRoot(null);
+            }}
+          >
+            전체 보기
+          </button>
+        </div>
+        <input placeholder={flowMode ? "목록에서 찾기 (클래스 · 주소)" : "클래스 · 주소 · 파일 찾기"} value={q} onChange={(e) => setQ(e.target.value)} style={{ width: 220 }} />
+        {!flowMode && (
+          <>
         <select value={group} onChange={(e) => setGroup(e.target.value)} disabled={grouped}>
           <option value="">{all ? "전체 프로젝트 · 기능" : "전체 기능"}</option>
           {groups.map((g) => (
@@ -410,6 +501,8 @@ function FlowInner({ projectId, hasApiKey, onOpen }: Props) {
           <input type="checkbox" checked={focus} onChange={(e) => setFocusRoot(e.target.checked ? selected : null)} disabled={!selected || grouped} />
           선택한 흐름만
         </label>
+          </>
+        )}
         <span className="grow" />
         {!all && (
           <button className="btn small" onClick={describe} disabled={!hasApiKey || !!describing.endsWith("…")} title={hasApiKey ? "주석이 없는 항목에 Claude 가 한 줄 설명을 붙입니다" : "설정에서 API 키를 넣어 주세요"}>
@@ -448,7 +541,27 @@ function FlowInner({ projectId, hasApiKey, onOpen }: Props) {
       </div>
 
       <div className="flow-main">
-        <div className="flow-canvas">
+        {flowMode && (
+          <aside className="flow-list">
+            {startsShown.map((g) => (
+              <div key={g.group}>
+                <div className="flow-list-group">{g.group || "(기본)"}</div>
+                {g.nodes.map((n) => (
+                  <button key={n.id} className={"flow-list-item" + (n.id === focusRoot ? " on" : "")} onClick={() => pick(n.id)} title={n.desc ?? n.file}>
+                    <i className="kdot" style={{ background: KIND[n.kind].color }} />
+                    <span className="grow">
+                      {n.label}
+                      {n.endpoints?.length ? <span className="muted"> · 주소 {n.endpoints.length}</span> : null}
+                      {n.changed && <span className="fnode-changed"> 수정됨</span>}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            ))}
+            {!startsShown.length && <div className="muted small pad">맞는 항목이 없습니다.</div>}
+          </aside>
+        )}
+        <div className="flow-canvas" ref={canvasRef}>
           <ReactFlow
             nodes={rfNodes}
             edges={rfEdges}
@@ -476,10 +589,14 @@ function FlowInner({ projectId, hasApiKey, onOpen }: Props) {
 
         <aside className="flow-side">
           {sel ? (
-            <NodeDetail n={sel} graph={graph} onOpen={open} onSelect={setSelected} />
+            <NodeDetail n={sel} graph={graph} onOpen={open} onSelect={setSelected} onRoot={flowMode && sel.id !== focusRoot ? pick : undefined} />
           ) : (
             <div className="muted small">
-              <p>노드를 누르면 이어진 흐름이 강조되고 여기에 자세한 내용이 나옵니다. 두 번 누르면 코드 탭에서 엽니다.</p>
+              <p>
+                {flowMode
+                  ? "왼쪽 목록에서 하나를 고르면 그 흐름만 보여줍니다. 노드를 누르면 자세한 내용, 두 번 누르면 코드 탭에서 엽니다."
+                  : "노드를 누르면 이어진 흐름이 강조되고 여기에 자세한 내용이 나옵니다. 두 번 누르면 코드 탭에서 엽니다."}
+              </p>
               <p>마우스 휠로 확대·축소, 빈 곳을 끌어서 이동합니다. 위의 종류 버튼으로 숨기면 그 단계는 건너뛰고 연결합니다.</p>
               <p>분석: {fmtTime(graph.generatedAt)}</p>
               {graph.unresolved.length > 0 && (
@@ -509,11 +626,13 @@ function NodeDetail({
   graph,
   onOpen,
   onSelect,
+  onRoot,
 }: {
   n: FlowNode;
   graph: FlowGraph;
   onOpen: (n: FlowNode, line?: number) => void;
   onSelect: (id: string) => void;
+  onRoot?: (id: string) => void;
 }) {
   const byId = new Map(graph.nodes.map((x) => [x.id, x]));
   const incoming = graph.edges.filter((e) => e.target === n.id);
@@ -545,6 +664,11 @@ function NodeDetail({
         {n.group ? ` · ${n.group}` : ""}
         {n.changed && <span className="fnode-changed"> 수정됨</span>}
       </div>
+      {onRoot && (
+        <button className="btn small primary" style={{ margin: "6px 0" }} onClick={() => onRoot(n.id)}>
+          이것 기준으로 흐름 보기
+        </button>
+      )}
       {n.desc && (
         <p>
           {n.desc}
