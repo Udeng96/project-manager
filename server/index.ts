@@ -143,8 +143,8 @@ app.delete("/api/deployments/:id", async (req) => {
   return { ok: true };
 });
 app.post("/api/projects/:id/deploy/upload", async (req) => {
-  const { path: rel, remoteDir } = req.body as { path: string; remoteDir?: string };
-  return deploy.openUpload(projects.getProject(id(req.params)), rel, remoteDir);
+  const { path: rel, server, remoteDir } = req.body as { path: string; server?: string; remoteDir?: string };
+  return deploy.openUpload(projects.getProject(id(req.params)), rel, server, remoteDir);
 });
 
 // ---------- 프롬프트 ----------

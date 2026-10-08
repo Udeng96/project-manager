@@ -235,13 +235,14 @@ export function deleteDeployment(id: number) {
 
 // ---------- Tailscale 프로그램으로 넘기기 ----------
 
-export const UPLOAD_SCHEME = "ulsan-tailscale";
+export const UPLOAD_SCHEME = "tailscale-manager";
 
-/** Tailscale 관리 프로그램을 열고 올릴 파일을 넘긴다 (프로그램이 ulsan-tailscale:// 주소를 받도록 등록되어 있어야 함) */
-export function openUpload(project: Project, rel: string, remoteDir?: string) {
+/** Tailscale 관리 프로그램을 열고 올릴 파일을 넘긴다 (프로그램이 tailscale-manager:// 주소를 받도록 등록되어 있어야 함) */
+export function openUpload(project: Project, rel: string, server?: string, remoteDir?: string) {
   const abs = resolveIn(project.path, rel);
   if (!fs.existsSync(abs)) throw httpError(400, `파일이 없습니다: ${rel}`);
   const q = new URLSearchParams({ file: abs, project: project.name });
+  if (server) q.set("server", server);
   if (remoteDir) q.set("remoteDir", remoteDir);
   const url = `${UPLOAD_SCHEME}://upload?${q.toString()}`;
 

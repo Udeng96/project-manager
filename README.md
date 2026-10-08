@@ -52,7 +52,7 @@ npm start
 
 ## Tailscale 프로그램 연동
 
-배포 탭의 "서버에 올리기"는 `ulsan-tailscale://upload?file=<로컬 절대경로>&project=<이름>&remoteDir=<선택>` 주소를 OS에 넘깁니다.
+배포 탭의 "서버에 올리기"는 `tailscale-manager://upload?file=<로컬 절대경로>&server=<서버 id, 선택>&remoteDir=<선택>&project=<이름>` 주소를 OS에 넘깁니다.
 Tailscale 관리 프로그램이 이 주소를 받도록 등록되어 있어야 열립니다 (설치 전에는 안내 메시지만 나옵니다).
 
 ## 참고

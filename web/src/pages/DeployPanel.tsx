@@ -126,7 +126,17 @@ function FileView(props: { project: Project; file: DeployFile; configs: DeployFi
   const [content, setContent] = useState<FileContent | null>(null);
   const [compareWith, setCompareWith] = useState("");
   const [other, setOther] = useState<FileContent | null>(null);
-  const [remoteDir, setRemoteDir] = useState("");
+  // 서버 id, 경로는 프로젝트마다 마지막 값을 기억
+  const memKey = `pm.upload.${project.id}`;
+  const remembered = (() => {
+    try {
+      return JSON.parse(localStorage.getItem(memKey) ?? "{}") as { server?: string; remoteDir?: string };
+    } catch {
+      return {};
+    }
+  })();
+  const [server, setServer] = useState(remembered.server ?? "");
+  const [remoteDir, setRemoteDir] = useState(remembered.remoteDir ?? "");
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
 
   useEffect(() => {
@@ -141,7 +151,16 @@ function FileView(props: { project: Project; file: DeployFile; configs: DeployFi
   const upload = async () => {
     setMsg(null);
     try {
-      await api.post(`/api/projects/${project.id}/deploy/upload`, { path: file.path, remoteDir: remoteDir.trim() || undefined });
+      try {
+        localStorage.setItem(memKey, JSON.stringify({ server, remoteDir }));
+      } catch {
+        /* 저장 못 해도 업로드에는 영향 없음 */
+      }
+      await api.post(`/api/projects/${project.id}/deploy/upload`, {
+        path: file.path,
+        server: server.trim() || undefined,
+        remoteDir: remoteDir.trim() || undefined,
+      });
       setMsg({ ok: true, text: "Tailscale 프로그램을 열었습니다. 그쪽에서 서버와 경로를 확인한 뒤 업로드하세요." });
     } catch (e) {
       setMsg({ ok: false, text: (e as Error).message });
@@ -190,6 +209,7 @@ function FileView(props: { project: Project; file: DeployFile; configs: DeployFi
           <h3>서버에 올리기</h3>
           <p className="muted small">Tailscale 프로그램이 열리고 이 파일이 업로드 대상으로 잡힙니다. 실제 업로드는 그 프로그램에서 서버와 경로를 확인한 뒤 진행합니다.</p>
           <div className="row">
+            <input className="mono" placeholder="서버 (선택, 예: dashboard)" value={server} onChange={(e) => setServer(e.target.value)} />
             <input className="grow mono" placeholder="서버 경로 (선택, 예: /opt/broadcast)" value={remoteDir} onChange={(e) => setRemoteDir(e.target.value)} />
             <button className="btn primary" onClick={upload}>
               ↑ 서버에 올리기
