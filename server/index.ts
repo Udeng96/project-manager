@@ -11,6 +11,7 @@ import * as ai from "./ai.js";
 import * as worklog from "./worklog.js";
 import * as files from "./files.js";
 import * as deploy from "./deploy.js";
+import * as flow from "./flow.js";
 
 const PORT = Number(process.env.PORT ?? 4100);
 const HOST = process.env.HOST ?? "127.0.0.1"; // 내 PC에서만 접속
@@ -145,6 +146,20 @@ app.delete("/api/deployments/:id", async (req) => {
 app.post("/api/projects/:id/deploy/upload", async (req) => {
   const { path: rel, server, remoteDir } = req.body as { path: string; server?: string; remoteDir?: string };
   return deploy.openUpload(projects.getProject(id(req.params)), rel, server, remoteDir);
+});
+
+// ---------- 구조 흐름도 ----------
+app.get("/api/flow", async (req) => flow.buildAll(projects.listProjects(), (req.query as { refresh?: string }).refresh === "1"));
+app.get("/api/projects/:id/flow", async (req) =>
+  flow.buildProject(projects.listProjects(), id(req.params), (req.query as { refresh?: string }).refresh === "1"),
+);
+app.post("/api/projects/:id/flow/describe", async (req) => {
+  if (!ai.hasApiKey()) throw projects.httpError(400, "설정에서 Claude API 키를 먼저 입력해 주세요.");
+  try {
+    return await flow.describe(projects.listProjects(), id(req.params));
+  } catch (e) {
+    throw ai.friendlyError(e);
+  }
 });
 
 // ---------- 프롬프트 ----------

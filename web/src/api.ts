@@ -119,3 +119,45 @@ export function fmtSize(n: number) {
   if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
   return `${(n / 1024 / 1024).toFixed(1)} MB`;
 }
+
+export type FlowKind =
+  | "screen"
+  | "api"
+  | "controller"
+  | "service"
+  | "repository"
+  | "client"
+  | "scheduler"
+  | "component"
+  | "entity"
+  | "table"
+  | "external";
+
+export type FlowNode = {
+  id: string;
+  projectId: number | null;
+  project: string;
+  kind: FlowKind;
+  label: string;
+  file?: string;
+  fileProjectId?: number;
+  folder?: string;
+  line?: number;
+  desc?: string;
+  descBy?: "code" | "claude";
+  group?: string;
+  endpoints?: { method: string; path: string; line: number }[];
+  calls?: { method: string; url: string }[];
+  scheduled?: boolean;
+  changed?: boolean;
+  schema?: string;
+};
+
+export type FlowEdge = { id: string; source: string; target: string; label?: string; cross?: boolean };
+
+export type FlowGraph = {
+  nodes: FlowNode[];
+  edges: FlowEdge[];
+  unresolved: { projectId: number; project: string; file: string; url: string; reason: string }[];
+  generatedAt: string;
+};

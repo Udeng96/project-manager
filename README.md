@@ -40,7 +40,20 @@ npm start
 | 남은 작업 | 프로젝트별 "남은 작업"과 "확인할 것". 완료 체크하면 작업 기록에 반영 |
 | 날짜별 작업 기록 | 그날 쓴 프롬프트, 내 git 커밋, 완료한 할 일을 모아 "10월 8일 (목)" 형식으로 짧게 요약. 30분마다 자동 정리, 직접 수정 가능 |
 | 프로젝트 설정 | 이름, 실행/빌드/클린 빌드 명령 수정 (예: `gradlew.bat bootRun --args=--spring.profiles.active=dev`) |
-| 구조 흐름도 / 개선 제안 | 2단계, 3단계에서 추가 예정 |
+| 구조 흐름도 | 코드를 읽어서 클래스 단위로 화면 → API 호출 파일 → Controller → Service → Repository → Entity → DB 테이블, 외부 호출을 흐름도로 표시. 확대·이동, 노드를 누르면 이어진 흐름 강조와 자세한 내용(주소 목록, 쓰는 곳/쓰이는 곳), 두 번 누르면 코드 탭에서 열기. git 수정 파일은 주황색. 종류별 숨기기(숨긴 단계는 건너뛰어 연결), 기능(패키지·폴더)별 보기, "Claude 설명 채우기"(주석 없는 클래스에 한 줄 설명) |
+| 전체 구조 흐름도 (왼쪽 메뉴) | 등록한 프로젝트 전체를 한 그림으로. 처음엔 기능 묶음 단위로 보이고, 묶음을 누르면 클래스 단위로 펼침. 프로젝트 사이 호출은 분홍 점선 |
+| 개선 제안 | 3단계에서 추가 예정 |
+
+## 구조 흐름도가 연결을 찾는 방법
+
+- Spring: `@RestController`/`@Controller`, `@Service`, `@Repository`(JpaRepository), `@Entity`/`@Table`, `@Component`(RestClient 등을 쓰면 "외부 호출"), `@Scheduled`.
+  생성자·final 필드로 주입받는 클래스끼리 연결하고, 인터페이스로 주입받으면 구현 클래스로 잇습니다.
+  테이블은 `@Table(name, schema)` 기준이고, 그 테이블을 만든 `db/migration` SQL 을 붙입니다.
+- 주소: `server.servlet.context-path` + 클래스 `@RequestMapping` + 메서드 `@GetMapping` 등.
+- React: `src/features/<a>/<b>`, `src/routes`, `src/pages` 를 화면 묶음으로, `fetch`/`axios`/`EventSource` 로 부르는 주소가 있는 파일을 "API 호출 파일"로 봅니다.
+- 프로젝트 사이 연결: 프론트는 `vite.config` 의 `proxy` 대상 포트 → 그 포트(`server.port`)를 쓰는 프로젝트의 Controller 주소와 맞춥니다.
+  백엔드끼리는 `@ConfigurationProperties` 의 `base-url` + `path` 값(application.yml)으로 찾습니다.
+- 등록 안 된 서비스(예: weather, owl)나 외부 사이트는 "다른 서비스 · 외부" 노드로 표시합니다.
 
 ## 실행 명령 자동 인식
 

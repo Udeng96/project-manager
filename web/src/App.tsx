@@ -9,8 +9,9 @@ import SettingsPage from "./pages/SettingsPage";
 import ProjectSettings from "./pages/ProjectSettings";
 import CodePanel from "./pages/CodePanel";
 import DeployPanel from "./pages/DeployPanel";
+import FlowPanel from "./pages/FlowPanel";
 
-type View = { kind: "project"; id: number } | { kind: "worklog" } | { kind: "todos" } | { kind: "settings" };
+type View = { kind: "project"; id: number } | { kind: "flow" } | { kind: "worklog" } | { kind: "todos" } | { kind: "settings" };
 type Tab = "ops" | "code" | "deploy" | "prompt" | "todo" | "flow" | "suggest" | "config";
 
 const TABS: { key: Tab; label: string; later?: string }[] = [
@@ -19,7 +20,7 @@ const TABS: { key: Tab; label: string; later?: string }[] = [
   { key: "deploy", label: "배포" },
   { key: "prompt", label: "프롬프트" },
   { key: "todo", label: "남은 작업" },
-  { key: "flow", label: "구조 흐름도", later: "2단계" },
+  { key: "flow", label: "구조 흐름도" },
   { key: "suggest", label: "개선 제안", later: "3단계" },
   { key: "config", label: "프로젝트 설정" },
 ];
@@ -34,6 +35,13 @@ export default function App() {
 
   // 다른 화면에서 파일을 누르면 코드 탭으로 이동해서 연다
   const openInCode = useCallback((path: string, line?: number) => {
+    setOpenRequest({ path, line, nonce: Date.now() });
+    setTab("code");
+  }, []);
+
+  // 전체 흐름도 등에서 다른 프로젝트 파일 열기
+  const openFile = useCallback((projectId: number, path: string, line?: number) => {
+    setView({ kind: "project", id: projectId });
     setOpenRequest({ path, line, nonce: Date.now() });
     setTab("code");
   }, []);
@@ -78,6 +86,9 @@ export default function App() {
         </button>
 
         <div className="side-label">전체</div>
+        <button className={"side-item" + (view.kind === "flow" ? " active" : "")} onClick={() => setView({ kind: "flow" })}>
+          전체 구조 흐름도
+        </button>
         <button className={"side-item" + (view.kind === "worklog" ? " active" : "")} onClick={() => setView({ kind: "worklog" })}>
           날짜별 작업 기록
         </button>
@@ -120,11 +131,8 @@ export default function App() {
               {tab === "deploy" && <DeployPanel key={current.id} project={current} onOpenInCode={openInCode} />}
               {tab === "prompt" && <PromptPanel key={current.id} project={current} hasApiKey={!!settings?.hasApiKey} onOpenInCode={openInCode} />}
               {tab === "todo" && <TodoPanel key={current.id} projectId={current.id} projects={projects} />}
-              {(tab === "flow" || tab === "suggest") && (
-                <div className="empty">
-                  {tab === "flow" ? "구조 흐름도는 2단계에서 만듭니다." : "개선 제안은 3단계에서 만듭니다."}
-                </div>
-              )}
+              {tab === "flow" && <FlowPanel key={current.id} projectId={current.id} hasApiKey={!!settings?.hasApiKey} onOpen={openFile} />}
+              {tab === "suggest" && <div className="empty">개선 제안은 3단계에서 만듭니다.</div>}
               {tab === "config" && (
                 <ProjectSettings
                   key={current.id}
@@ -137,6 +145,17 @@ export default function App() {
                 />
               )}
             </section>
+          </>
+        )}
+        {view.kind === "flow" && (
+          <>
+            <header className="page-head">
+              <div>
+                <h1>전체 구조 흐름도</h1>
+                <div className="muted">등록한 프로젝트를 모두 분석해서 화면 → API → 백엔드 → DB, 프로젝트 사이 호출을 한 그림으로 보여줍니다.</div>
+              </div>
+            </header>
+            <FlowPanel hasApiKey={!!settings?.hasApiKey} onOpen={openFile} />
           </>
         )}
         {view.kind === "worklog" && <WorklogPage />}
