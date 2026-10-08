@@ -20,6 +20,7 @@ CREATE TABLE IF NOT EXISTS projects (
   kind        TEXT NOT NULL,
   run_cmd     TEXT NOT NULL DEFAULT '',
   build_cmd   TEXT NOT NULL DEFAULT '',
+  clean_cmd   TEXT NOT NULL DEFAULT '',
   created_at  TEXT NOT NULL
 );
 
@@ -55,11 +56,40 @@ CREATE TABLE IF NOT EXISTS worklogs (
   PRIMARY KEY (date, project_id)
 );
 
+-- 자동으로 못 찾는 배포 파일을 직접 등록
+CREATE TABLE IF NOT EXISTS deploy_files (
+  id          INTEGER PRIMARY KEY AUTOINCREMENT,
+  project_id  INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  path        TEXT NOT NULL,
+  category    TEXT NOT NULL,
+  UNIQUE (project_id, path)
+);
+
+-- 배포 기록. snapshot 은 배포 당시 배포 관련 파일들의 해시 (다음 배포 때 바뀐 것 표시용)
+CREATE TABLE IF NOT EXISTS deployments (
+  id           INTEGER PRIMARY KEY AUTOINCREMENT,
+  project_id   INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  deployed_at  TEXT NOT NULL,
+  version      TEXT NOT NULL DEFAULT '',
+  artifact     TEXT NOT NULL DEFAULT '',
+  target       TEXT NOT NULL DEFAULT '',
+  sqls         TEXT NOT NULL DEFAULT '[]',
+  scripts      TEXT NOT NULL DEFAULT '[]',
+  checklist    TEXT NOT NULL DEFAULT '[]',
+  memo         TEXT NOT NULL DEFAULT '',
+  snapshot     TEXT NOT NULL DEFAULT '{}',
+  created_at   TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS settings (
   key   TEXT PRIMARY KEY,
   value TEXT NOT NULL
 );
 `);
+
+// 이전 버전 DB 에 새 컬럼 추가
+const projectCols = (db.prepare("PRAGMA table_info(projects)").all() as { name: string }[]).map((c) => c.name);
+if (!projectCols.includes("clean_cmd")) db.exec("ALTER TABLE projects ADD COLUMN clean_cmd TEXT NOT NULL DEFAULT ''");
 
 export function getSetting(key: string): string | undefined {
   const row = db.prepare("SELECT value FROM settings WHERE key = ?").get(key) as { value: string } | undefined;

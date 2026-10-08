@@ -4,12 +4,15 @@ import type { Project } from "./projects.js";
 
 const isWin = process.platform === "win32";
 const MAX_LINES = 3000;
+const TASK_LABEL = { run: "실행", build: "빌드", clean: "클린 빌드" } as const;
+
+export type Task = "run" | "build" | "clean";
 
 export type LogLine = { seq: number; at: string; stream: "out" | "err" | "sys"; text: string };
 
 type Proc = {
   child: ChildProcess | null;
-  task: "run" | "build" | null;
+  task: Task | null;
   startedAt: string | null;
   exitCode: number | null;
   lines: LogLine[];
@@ -62,13 +65,13 @@ export function status(projectId: number) {
   };
 }
 
-export function start(project: Project, task: "run" | "build") {
+export function start(project: Project, task: Task) {
   const p = state(project.id);
   if (p.child) throw Object.assign(new Error("이미 실행 중입니다. 먼저 중지해 주세요."), { statusCode: 409 });
-  const cmd = task === "run" ? project.run_cmd : project.build_cmd;
+  const cmd = task === "run" ? project.run_cmd : task === "clean" ? project.clean_cmd : project.build_cmd;
   if (!cmd.trim()) throw Object.assign(new Error("실행 명령이 비어 있습니다. 설정에서 입력해 주세요."), { statusCode: 400 });
 
-  push(p, "sys", `▶ ${task === "run" ? "실행" : "빌드"}: ${cmd}  (${project.path})`);
+  push(p, "sys", `▶ ${TASK_LABEL[task]}: ${cmd}  (${project.path})`);
   const child = spawn(cmd, {
     cwd: project.path,
     shell: true,

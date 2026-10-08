@@ -9,6 +9,8 @@ import * as runner from "./runner.js";
 import * as git from "./git.js";
 import * as ai from "./ai.js";
 import * as worklog from "./worklog.js";
+import * as files from "./files.js";
+import * as deploy from "./deploy.js";
 
 const PORT = Number(process.env.PORT ?? 4100);
 const HOST = process.env.HOST ?? "127.0.0.1"; // 내 PC에서만 접속
@@ -59,7 +61,7 @@ app.get("/api/projects/:id/redetect", async (req) => projects.detect(projects.ge
 
 // ---------- 실행 / 로그 ----------
 app.post("/api/projects/:id/run", async (req) => {
-  const { task } = (req.body ?? {}) as { task?: "run" | "build" };
+  const { task } = (req.body ?? {}) as { task?: runner.Task };
   return runner.start(projects.getProject(id(req.params)), task ?? "run");
 });
 
@@ -108,6 +110,42 @@ app.post("/api/projects/:id/git/commit", async (req) => {
 });
 app.post("/api/projects/:id/git/push", async (req) => ({ output: await git.push(projects.getProject(id(req.params)).path) }));
 app.post("/api/projects/:id/git/pull", async (req) => ({ output: await git.pull(projects.getProject(id(req.params)).path) }));
+
+// ---------- 코드 보기 (읽기 전용) ----------
+app.get("/api/projects/:id/fs/list", async (req) => {
+  const { dir = "", hidden } = req.query as { dir?: string; hidden?: string };
+  return files.listDir(projects.getProject(id(req.params)).path, dir, hidden === "1");
+});
+app.get("/api/projects/:id/fs/file", async (req) => {
+  const { path: rel } = req.query as { path: string };
+  return files.readText(projects.getProject(id(req.params)).path, rel);
+});
+app.get("/api/projects/:id/fs/find", async (req) => files.findFiles(projects.getProject(id(req.params)).path, (req.query as { q: string }).q ?? ""));
+app.get("/api/projects/:id/fs/search", async (req) => files.searchText(projects.getProject(id(req.params)).path, (req.query as { q: string }).q ?? ""));
+
+// ---------- 배포 ----------
+app.get("/api/deploy/categories", async () => ({ categories: deploy.CATEGORIES, checklist: deploy.DEFAULT_CHECKLIST }));
+app.get("/api/projects/:id/deploy/files", async (req) => deploy.scan(projects.getProject(id(req.params))));
+app.post("/api/projects/:id/deploy/files", async (req) => {
+  const { path: rel, category } = req.body as { path: string; category: deploy.Category };
+  deploy.addCustom(projects.getProject(id(req.params)), rel, category);
+  return { ok: true };
+});
+app.delete("/api/projects/:id/deploy/files", async (req) => {
+  deploy.removeCustom(id(req.params), (req.query as { path: string }).path);
+  return { ok: true };
+});
+app.get("/api/projects/:id/deployments", async (req) => deploy.listDeployments(id(req.params)));
+app.post("/api/projects/:id/deployments", async (req) => deploy.createDeployment(projects.getProject(id(req.params)), req.body as deploy.DeploymentInput));
+app.patch("/api/deployments/:id", async (req) => deploy.updateDeployment(id(req.params), req.body as deploy.DeploymentInput));
+app.delete("/api/deployments/:id", async (req) => {
+  deploy.deleteDeployment(id(req.params));
+  return { ok: true };
+});
+app.post("/api/projects/:id/deploy/upload", async (req) => {
+  const { path: rel, remoteDir } = req.body as { path: string; remoteDir?: string };
+  return deploy.openUpload(projects.getProject(id(req.params)), rel, remoteDir);
+});
 
 // ---------- 프롬프트 ----------
 app.get("/api/projects/:id/prompts", async (req) =>

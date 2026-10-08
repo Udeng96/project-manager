@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { api, type Project, type Settings } from "./api";
+import { api, type OpenRequest, type Project, type Settings } from "./api";
 import RunPanel from "./pages/RunPanel";
 import GitPanel from "./pages/GitPanel";
 import PromptPanel from "./pages/PromptPanel";
@@ -7,12 +7,16 @@ import TodoPanel from "./pages/TodoPanel";
 import WorklogPage from "./pages/WorklogPage";
 import SettingsPage from "./pages/SettingsPage";
 import ProjectSettings from "./pages/ProjectSettings";
+import CodePanel from "./pages/CodePanel";
+import DeployPanel from "./pages/DeployPanel";
 
 type View = { kind: "project"; id: number } | { kind: "worklog" } | { kind: "todos" } | { kind: "settings" };
-type Tab = "ops" | "prompt" | "todo" | "flow" | "suggest" | "config";
+type Tab = "ops" | "code" | "deploy" | "prompt" | "todo" | "flow" | "suggest" | "config";
 
 const TABS: { key: Tab; label: string; later?: string }[] = [
   { key: "ops", label: "실행 · 형상관리" },
+  { key: "code", label: "코드" },
+  { key: "deploy", label: "배포" },
   { key: "prompt", label: "프롬프트" },
   { key: "todo", label: "남은 작업" },
   { key: "flow", label: "구조 흐름도", later: "2단계" },
@@ -26,6 +30,13 @@ export default function App() {
   const [tab, setTab] = useState<Tab>("ops");
   const [adding, setAdding] = useState(false);
   const [settings, setSettings] = useState<Settings | null>(null);
+  const [openRequest, setOpenRequest] = useState<OpenRequest | null>(null);
+
+  // 다른 화면에서 파일을 누르면 코드 탭으로 이동해서 연다
+  const openInCode = useCallback((path: string, line?: number) => {
+    setOpenRequest({ path, line, nonce: Date.now() });
+    setTab("code");
+  }, []);
 
   const load = useCallback(async () => {
     const list = await api.get<Project[]>("/api/projects");
@@ -51,7 +62,10 @@ export default function App() {
           <button
             key={p.id}
             className={"side-item" + (view.kind === "project" && view.id === p.id ? " active" : "")}
-            onClick={() => setView({ kind: "project", id: p.id })}
+            onClick={() => {
+              setView({ kind: "project", id: p.id });
+              setOpenRequest(null);
+            }}
             title={p.path}
           >
             <span className={"dot" + (p.status.running ? " on" : "")} />
@@ -96,10 +110,15 @@ export default function App() {
               {tab === "ops" && (
                 <div className="ops">
                   <RunPanel key={`run-${current.id}`} project={current} onChange={load} />
-                  <GitPanel key={`git-${current.id}`} project={current} />
+                  <GitPanel key={`git-${current.id}`} project={current} onOpenInCode={openInCode} />
                 </div>
               )}
-              {tab === "prompt" && <PromptPanel key={current.id} project={current} hasApiKey={!!settings?.hasApiKey} />}
+              {/* 코드 탭은 열린 파일 탭을 유지하도록 숨기기만 한다 */}
+              <div style={{ display: tab === "code" ? "block" : "none" }}>
+                <CodePanel key={current.id} project={current} openRequest={openRequest} visible={tab === "code"} />
+              </div>
+              {tab === "deploy" && <DeployPanel key={current.id} project={current} onOpenInCode={openInCode} />}
+              {tab === "prompt" && <PromptPanel key={current.id} project={current} hasApiKey={!!settings?.hasApiKey} onOpenInCode={openInCode} />}
               {tab === "todo" && <TodoPanel key={current.id} projectId={current.id} projects={projects} />}
               {(tab === "flow" || tab === "suggest") && (
                 <div className="empty">

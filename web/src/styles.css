@@ -144,3 +144,56 @@ label.check { flex-direction: row; align-items: center; gap: 6px; margin: 0; col
 .modal-bg { position: fixed; inset: 0; background: rgba(15, 20, 30, .45); display: flex; align-items: center; justify-content: center; z-index: 10; }
 .modal { background: #fff; border-radius: 12px; padding: 20px; width: min(560px, 92vw); }
 .form { max-width: 700px; }
+
+/* 공통 보조 */
+.full { width: 100%; }
+.ell { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.break { word-break: break-all; }
+.strike { text-decoration: line-through; }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 7px; overflow: hidden; }
+.seg button { font: inherit; font-size: 13px; border: 0; background: #fff; padding: 5px 12px; cursor: pointer; color: var(--muted); }
+.seg button.on { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0 16px; }
+@media (max-width: 900px) { .grid2 { grid-template-columns: 1fr; } }
+.kv { display: flex; gap: 10px; align-items: center; }
+.checks { display: flex; flex-direction: column; gap: 4px; max-height: 220px; overflow: auto; }
+
+/* 코드 탭 */
+.code { display: grid; grid-template-columns: 300px minmax(0, 1fr); gap: 12px; }
+.code-side { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; height: calc(100vh - 190px); display: flex; flex-direction: column; overflow: hidden; }
+.code-side-head { display: flex; justify-content: space-between; align-items: center; padding: 8px; border-bottom: 1px solid var(--line); }
+.tree { overflow: auto; flex: 1; padding-bottom: 12px; font-size: 13px; }
+.tree-row { padding: 2px 8px; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tree-row:hover { background: #f1f4f9; }
+.tree-row.active { background: var(--accent-soft); }
+.tree-row .caret { display: inline-block; width: 12px; color: var(--muted); }
+.tree-row.mod, .fname.mod { color: #2f6fed; }
+.tree-row.new, .fname.new { color: var(--ok); }
+.tree-row.del, .fname.del { color: var(--danger); text-decoration: line-through; }
+.code-main { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; min-height: calc(100vh - 190px); }
+.code-tabs { display: flex; overflow-x: auto; border-bottom: 1px solid var(--line); background: #fafbfc; }
+.code-tab { display: flex; align-items: center; gap: 6px; padding: 7px 10px 7px 14px; font-size: 13px; cursor: pointer; border-right: 1px solid var(--line); white-space: nowrap; }
+.code-tab.active { background: #fff; box-shadow: inset 0 -2px 0 var(--accent); }
+.code-tab .x { border: 0; background: none; cursor: pointer; color: var(--muted); font-size: 15px; line-height: 1; }
+.code-path { padding: 5px 12px; border-bottom: 1px solid var(--line); }
+.code-main .empty { margin: 16px; }
+.search-pane { display: flex; flex-direction: column; min-height: 0; flex: 1; }
+.hit-file { padding: 6px 8px 2px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hit { padding: 2px 8px 2px 16px; font-size: 12px; font-family: var(--mono); cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.hit:hover { background: #f1f4f9; }
+.modal.quick { padding: 12px; width: min(680px, 94vw); align-self: flex-start; margin-top: 12vh; }
+.quick-list { max-height: 50vh; overflow: auto; margin-top: 8px; }
+.quick-item { padding: 6px 8px; border-radius: 6px; cursor: pointer; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.quick-item.on { background: var(--accent-soft); }
+
+/* 배포 탭 */
+.deploy { display: grid; grid-template-columns: 340px minmax(0, 1fr); gap: 12px; align-items: start; }
+@media (max-width: 1000px) { .deploy { grid-template-columns: 1fr; } }
+.deploy-list { padding: 6px 0; max-height: calc(100vh - 220px); overflow: auto; }
+.deploy-cat-head { font-size: 12px; font-weight: 600; color: var(--muted); padding: 10px 14px 4px; }
+.deploy-item { display: flex; align-items: center; gap: 6px; padding: 4px 14px; cursor: pointer; }
+.deploy-item:hover { background: #f1f4f9; }
+.deploy-item.active { background: var(--accent-soft); }
+.diff-labels { display: grid; grid-template-columns: 1fr 1fr; padding: 4px 0; }
+.history { max-width: 1000px; }
+.history > .btn { margin-bottom: 12px; }

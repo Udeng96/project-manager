@@ -33,11 +33,13 @@ npm start
 
 | 화면 | 내용 |
 |---|---|
-| 실행 · 형상관리 | 실행/빌드/중지, 실시간 로그(검색, 오류만 보기), 변경 파일과 diff, 선택 파일 커밋, pull, 푸쉬, 최근 커밋 |
+| 실행 · 형상관리 | 실행/빌드/클린 빌드/중지, 실시간 로그(검색, 오류만 보기), 변경 파일과 diff, 선택 파일 커밋, pull, 푸쉬, 최근 커밋 |
+| 코드 | IntelliJ처럼 왼쪽 폴더 트리 + 오른쪽 코드 보기 (읽기 전용, VS Code와 같은 Monaco 에디터). Ctrl+P(맥 Cmd+P) 파일 이름 찾기, 전체 내용 검색, git 변경 파일 색 표시 |
+| 배포 | 배포 관련 파일 자동 분류 (war/jar + sha256, application*.yml, db/migration SQL 버전 순, deploy/*.sh, logback, *.service·nginx, DEPLOY.md). yml 나란히 비교, 직접 등록, "서버에 올리기"(Tailscale 프로그램 열기), 배포 기록·체크리스트, 지난 배포 이후 새로 생기거나 바뀐 파일 표시 |
 | 프롬프트 | 프로젝트에 대해 질문하면 Claude가 코드를 읽고 답함. 코드 수정이 필요하면 Claude Code에 붙여넣을 요청 프롬프트를 만들어 줌 (복사, 남은 작업에 추가) |
 | 남은 작업 | 프로젝트별 "남은 작업"과 "확인할 것". 완료 체크하면 작업 기록에 반영 |
 | 날짜별 작업 기록 | 그날 쓴 프롬프트, 내 git 커밋, 완료한 할 일을 모아 "10월 8일 (목)" 형식으로 짧게 요약. 30분마다 자동 정리, 직접 수정 가능 |
-| 프로젝트 설정 | 이름, 실행/빌드 명령 수정 (예: `gradlew.bat bootRun --args=--spring.profiles.active=dev`) |
+| 프로젝트 설정 | 이름, 실행/빌드/클린 빌드 명령 수정 (예: `gradlew.bat bootRun --args=--spring.profiles.active=dev`) |
 | 구조 흐름도 / 개선 제안 | 2단계, 3단계에서 추가 예정 |
 
 ## 실행 명령 자동 인식
@@ -47,6 +49,11 @@ npm start
 | build.gradle (+gradlew) | `gradlew bootRun` | `gradlew build` |
 | pom.xml | `mvn spring-boot:run` (mvnw 있으면 mvnw) | `mvn package` |
 | package.json | `pnpm dev` / `yarn dev` / `npm run dev` | `... build` |
+
+## Tailscale 프로그램 연동
+
+배포 탭의 "서버에 올리기"는 `ulsan-tailscale://upload?file=<로컬 절대경로>&project=<이름>&remoteDir=<선택>` 주소를 OS에 넘깁니다.
+Tailscale 관리 프로그램이 이 주소를 받도록 등록되어 있어야 열립니다 (설치 전에는 안내 메시지만 나옵니다).
 
 ## 참고
 

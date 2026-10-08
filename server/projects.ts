@@ -9,32 +9,43 @@ export type Project = {
   kind: string;
   run_cmd: string;
   build_cmd: string;
+  clean_cmd: string;
   created_at: string;
 };
 
 const isWin = process.platform === "win32";
 
 /** 폴더 안의 빌드 파일을 보고 프로젝트 종류와 기본 실행/빌드 명령을 정한다 */
-export function detect(dir: string): { kind: string; run_cmd: string; build_cmd: string } {
+export function detect(dir: string): { kind: string; run_cmd: string; build_cmd: string; clean_cmd: string } {
   const has = (f: string) => fs.existsSync(path.join(dir, f));
 
   if (has("build.gradle") || has("build.gradle.kts")) {
     const g = has("gradlew") ? (isWin ? "gradlew.bat" : "./gradlew") : "gradle";
-    return { kind: "gradle", run_cmd: `${g} bootRun`, build_cmd: `${g} build` };
+    return { kind: "gradle", run_cmd: `${g} bootRun`, build_cmd: `${g} build`, clean_cmd: `${g} clean build` };
   }
   if (has("pom.xml")) {
     const m = has("mvnw") ? (isWin ? "mvnw.cmd" : "./mvnw") : "mvn";
-    return { kind: "maven", run_cmd: `${m} spring-boot:run`, build_cmd: `${m} package` };
+    return { kind: "maven", run_cmd: `${m} spring-boot:run`, build_cmd: `${m} package`, clean_cmd: `${m} clean package` };
   }
   if (has("package.json")) {
     const pm = has("pnpm-lock.yaml") ? "pnpm" : has("yarn.lock") ? "yarn" : "npm run";
-    return { kind: "node", run_cmd: `${pm} dev`, build_cmd: `${pm} build` };
+    // dist 를 지우고 다시 빌드 (윈도우에서도 되도록 node 로 삭제)
+    const rm = `node -e "require('fs').rmSync('dist',{recursive:true,force:true})"`;
+    return { kind: "node", run_cmd: `${pm} dev`, build_cmd: `${pm} build`, clean_cmd: `${rm} && ${pm} build` };
   }
-  return { kind: "unknown", run_cmd: "", build_cmd: "" };
+  return { kind: "unknown", run_cmd: "", build_cmd: "", clean_cmd: "" };
 }
 
 export function listProjects(): Project[] {
-  return db.prepare("SELECT * FROM projects ORDER BY name").all() as Project[];
+  const list = db.prepare("SELECT * FROM projects ORDER BY name").all() as Project[];
+  // 클린 빌드 명령이 생기기 전에 등록한 프로젝트는 기본값으로 채운다
+  for (const p of list) {
+    if (!p.clean_cmd && fs.existsSync(p.path)) {
+      p.clean_cmd = detect(p.path).clean_cmd;
+      db.prepare("UPDATE projects SET clean_cmd = ? WHERE id = ?").run(p.clean_cmd, p.id);
+    }
+  }
+  return list;
 }
 
 export function getProject(id: number): Project {
@@ -53,17 +64,18 @@ export function addProject(rawPath: string, name?: string): Project {
 
   const d = detect(dir);
   const info = db
-    .prepare("INSERT INTO projects(name, path, kind, run_cmd, build_cmd, created_at) VALUES(?, ?, ?, ?, ?, ?)")
-    .run(name?.trim() || path.basename(dir), dir, d.kind, d.run_cmd, d.build_cmd, nowIso());
+    .prepare("INSERT INTO projects(name, path, kind, run_cmd, build_cmd, clean_cmd, created_at) VALUES(?, ?, ?, ?, ?, ?, ?)")
+    .run(name?.trim() || path.basename(dir), dir, d.kind, d.run_cmd, d.build_cmd, d.clean_cmd, nowIso());
   return getProject(Number(info.lastInsertRowid));
 }
 
-export function updateProject(id: number, patch: Partial<Pick<Project, "name" | "run_cmd" | "build_cmd">>) {
+export function updateProject(id: number, patch: Partial<Pick<Project, "name" | "run_cmd" | "build_cmd" | "clean_cmd">>) {
   const p = getProject(id);
-  db.prepare("UPDATE projects SET name = ?, run_cmd = ?, build_cmd = ? WHERE id = ?").run(
+  db.prepare("UPDATE projects SET name = ?, run_cmd = ?, build_cmd = ?, clean_cmd = ? WHERE id = ?").run(
     patch.name ?? p.name,
     patch.run_cmd ?? p.run_cmd,
     patch.build_cmd ?? p.build_cmd,
+    patch.clean_cmd ?? p.clean_cmd,
     id,
   );
   return getProject(id);

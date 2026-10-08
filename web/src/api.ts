@@ -1,4 +1,4 @@
-export type RunStatus = { running: boolean; task: "run" | "build" | null; pid: number | null; startedAt: string | null; exitCode: number | null };
+export type RunStatus = { running: boolean; task: "run" | "build" | "clean" | null; pid: number | null; startedAt: string | null; exitCode: number | null };
 
 export type Project = {
   id: number;
@@ -7,6 +7,7 @@ export type Project = {
   kind: string;
   run_cmd: string;
   build_cmd: string;
+  clean_cmd: string;
   status: RunStatus;
 };
 
@@ -79,4 +80,42 @@ export function fmtTime(iso: string) {
   const d = new Date(iso);
   const days = ["일", "월", "화", "수", "목", "금", "토"];
   return `${d.getMonth() + 1}월 ${d.getDate()}일 (${days[d.getDay()]}) ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+}
+
+export type FsEntry = { name: string; path: string; dir: boolean; size?: number };
+export type FileContent = { path: string; binary: boolean; tooLarge: boolean; size: number; mtime?: string; content: string };
+export type Hit = { path: string; line: number; text: string };
+
+/** 다른 화면에서 코드 탭으로 파일 열기 요청 */
+export type OpenRequest = { path: string; line?: number; nonce: number };
+
+export type DeployCategory = "config" | "log" | "sql" | "script" | "service" | "artifact" | "doc";
+export type DeployFile = {
+  path: string;
+  category: DeployCategory;
+  size: number;
+  mtime: string;
+  hash: string;
+  sqlVersion: number | null;
+  custom: boolean;
+  since: "new" | "changed" | "same" | null;
+  sha256?: string;
+};
+export type Deployment = {
+  id: number;
+  project_id: number;
+  deployed_at: string;
+  version: string;
+  artifact: string;
+  target: string;
+  sqls: string[];
+  scripts: string[];
+  checklist: { text: string; done: boolean }[];
+  memo: string;
+};
+
+export function fmtSize(n: number) {
+  if (n < 1024) return `${n} B`;
+  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
+  return `${(n / 1024 / 1024).toFixed(1)} MB`;
 }

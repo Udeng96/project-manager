@@ -5,6 +5,7 @@ export default function ProjectSettings({ project, onSaved, onDeleted }: { proje
   const [name, setName] = useState(project.name);
   const [runCmd, setRunCmd] = useState(project.run_cmd);
   const [buildCmd, setBuildCmd] = useState(project.build_cmd);
+  const [cleanCmd, setCleanCmd] = useState(project.clean_cmd);
   const [msg, setMsg] = useState("");
 
   return (
@@ -22,6 +23,10 @@ export default function ProjectSettings({ project, onSaved, onDeleted }: { proje
         빌드 명령
         <input className="mono" value={buildCmd} onChange={(e) => setBuildCmd(e.target.value)} />
       </label>
+      <label>
+        클린 빌드 명령
+        <input className="mono" value={cleanCmd} onChange={(e) => setCleanCmd(e.target.value)} />
+      </label>
       <p className="muted small">
         명령은 프로젝트 폴더에서 실행됩니다. 예: <code>gradlew.bat bootRun --args=--spring.profiles.active=dev</code>
       </p>
@@ -29,7 +34,7 @@ export default function ProjectSettings({ project, onSaved, onDeleted }: { proje
         <button
           className="btn primary"
           onClick={async () => {
-            await api.patch(`/api/projects/${project.id}`, { name, run_cmd: runCmd, build_cmd: buildCmd });
+            await api.patch(`/api/projects/${project.id}`, { name, run_cmd: runCmd, build_cmd: buildCmd, clean_cmd: cleanCmd });
             setMsg("저장했습니다.");
             onSaved();
           }}
@@ -39,9 +44,10 @@ export default function ProjectSettings({ project, onSaved, onDeleted }: { proje
         <button
           className="btn ghost"
           onClick={async () => {
-            const d = await api.get<{ run_cmd: string; build_cmd: string }>(`/api/projects/${project.id}/redetect`);
+            const d = await api.get<{ run_cmd: string; build_cmd: string; clean_cmd: string }>(`/api/projects/${project.id}/redetect`);
             setRunCmd(d.run_cmd);
             setBuildCmd(d.build_cmd);
+            setCleanCmd(d.clean_cmd);
           }}
         >
           기본값으로

@@ -54,7 +54,7 @@ export default function RunPanel({ project, onChange }: { project: Project; onCh
       <div className="card-head">
         <h2>실행 · 로그</h2>
         <span className={"pill" + (status.running ? " on" : "")}>
-          {status.running ? `${status.task === "build" ? "빌드" : "실행"} 중 (PID ${status.pid})` : status.exitCode != null ? `종료 (코드 ${status.exitCode})` : "중지됨"}
+          {status.running ? `${status.task === "build" ? "빌드" : status.task === "clean" ? "클린 빌드" : "실행"} 중 (PID ${status.pid})` : status.exitCode != null ? `종료 (코드 ${status.exitCode})` : "중지됨"}
         </span>
       </div>
       <div className="row">
@@ -63,6 +63,9 @@ export default function RunPanel({ project, onChange }: { project: Project; onCh
         </button>
         <button className="btn" disabled={status.running} onClick={() => act(() => api.post(`/api/projects/${project.id}/run`, { task: "build" }))} title={project.build_cmd}>
           빌드
+        </button>
+        <button className="btn" disabled={status.running} onClick={() => act(() => api.post(`/api/projects/${project.id}/run`, { task: "clean" }))} title={project.clean_cmd}>
+          클린 빌드
         </button>
         <button className="btn danger" disabled={!status.running} onClick={() => act(() => api.post(`/api/projects/${project.id}/stop`))}>
           ■ 중지

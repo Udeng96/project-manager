@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { api, fmtTime, type Project, type Prompt } from "../api";
 
-export default function PromptPanel({ project, hasApiKey }: { project: Project; hasApiKey: boolean }) {
+export default function PromptPanel({ project, hasApiKey, onOpenInCode }: { project: Project; hasApiKey: boolean; onOpenInCode: (path: string, line?: number) => void }) {
   const [items, setItems] = useState<Prompt[]>([]);
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
@@ -58,6 +58,7 @@ export default function PromptPanel({ project, hasApiKey }: { project: Project; 
           key={p.id}
           p={p}
           projectId={project.id}
+          onOpenInCode={onOpenInCode}
           onDelete={async () => {
             await api.del(`/api/prompts/${p.id}`);
             setItems((prev) => prev.filter((x) => x.id !== p.id));
@@ -68,7 +69,7 @@ export default function PromptPanel({ project, hasApiKey }: { project: Project; 
   );
 }
 
-function PromptItem({ p, projectId, onDelete }: { p: Prompt; projectId: number; onDelete: () => void }) {
+function PromptItem({ p, projectId, onDelete, onOpenInCode }: { p: Prompt; projectId: number; onDelete: () => void; onOpenInCode: (path: string, line?: number) => void }) {
   const [copied, setCopied] = useState(false);
   const [todoAdded, setTodoAdded] = useState(false);
 
@@ -82,7 +83,7 @@ function PromptItem({ p, projectId, onDelete }: { p: Prompt; projectId: number; 
       </div>
       <div className="question">{p.question}</div>
       {p.error && <div className="error">답변 실패: {p.error}</div>}
-      {p.answer && <div className="answer">{p.answer}</div>}
+      {p.answer && <div className="answer"><LinkedText text={p.answer} onOpen={onOpenInCode} /></div>}
       {p.claude_code_prompt && (
         <div className="cc-prompt">
           <div className="cc-head">
@@ -120,4 +121,26 @@ function PromptItem({ p, projectId, onDelete }: { p: Prompt; projectId: number; 
       )}
     </div>
   );
+}
+
+// 답변 안의 "src/main/.../Foo.java:42" 같은 경로를 눌러서 코드 탭으로 열 수 있게 한다
+const PATH_RE = /([\w.\-]+(?:\/[\w.\-]+)+\.[A-Za-z]{1,10})(?::(\d+))?/g;
+
+function LinkedText({ text, onOpen }: { text: string; onOpen: (path: string, line?: number) => void }) {
+  const parts: React.ReactNode[] = [];
+  let last = 0;
+  for (const m of text.matchAll(PATH_RE)) {
+    const i = m.index ?? 0;
+    if (i > last) parts.push(text.slice(last, i));
+    const path = m[1].replace(/^\.\//, "");
+    const line = m[2] ? Number(m[2]) : undefined;
+    parts.push(
+      <button key={i} className="link mono" onClick={() => onOpen(path, line)}>
+        {m[0]}
+      </button>,
+    );
+    last = i + m[0].length;
+  }
+  parts.push(text.slice(last));
+  return <>{parts}</>;
 }

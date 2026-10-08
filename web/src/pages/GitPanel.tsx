@@ -9,7 +9,7 @@ function changeLabel(f: { index: string; worktree: string; untracked: boolean })
   return LABEL[c] ?? c;
 }
 
-export default function GitPanel({ project }: { project: Project }) {
+export default function GitPanel({ project, onOpenInCode }: { project: Project; onOpenInCode: (path: string) => void }) {
   const [st, setSt] = useState<GitStatus | null>(null);
   const [commits, setCommits] = useState<Commit[]>([]);
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -121,9 +121,14 @@ export default function GitPanel({ project }: { project: Project }) {
         <div className="diff">
           <div className="diff-head">
             <span className="mono small">{diffFile}</span>
-            <button className="link" onClick={() => setDiffFile(null)}>
-              닫기
-            </button>
+            <span className="row" style={{ margin: 0 }}>
+              <button className="link small" onClick={() => onOpenInCode(diffFile)}>
+                코드 탭에서 열기
+              </button>
+              <button className="link small" onClick={() => setDiffFile(null)}>
+                닫기
+              </button>
+            </span>
           </div>
           <pre>
             {diff.split("\n").map((l, i) => (
