@@ -1,4 +1,3 @@
-import "./quiet.js";
 import Fastify from "fastify";
 import fastifyStatic from "@fastify/static";
 import fs from "node:fs";

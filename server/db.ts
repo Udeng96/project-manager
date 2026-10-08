@@ -1,5 +1,4 @@
-import type { DatabaseSync as DatabaseSyncType } from "node:sqlite";
-import { createRequire } from "node:module";
+import Database from "better-sqlite3";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -8,9 +7,7 @@ import path from "node:path";
 export const DATA_DIR = process.env.PM_DATA_DIR ?? path.join(os.homedir(), ".project-manager");
 fs.mkdirSync(DATA_DIR, { recursive: true });
 
-// quiet.ts 가 경고 필터를 건 뒤에 불러오도록 require 사용
-const { DatabaseSync } = createRequire(import.meta.url)("node:sqlite") as { DatabaseSync: typeof DatabaseSyncType };
-export const db = new DatabaseSync(path.join(DATA_DIR, "data.db"));
+export const db = new Database(path.join(DATA_DIR, "data.db"));
 
 db.exec(`
 PRAGMA journal_mode = WAL;
