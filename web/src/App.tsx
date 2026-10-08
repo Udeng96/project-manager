@@ -10,6 +10,7 @@ import ProjectSettings from "./pages/ProjectSettings";
 import CodePanel from "./pages/CodePanel";
 import DeployPanel from "./pages/DeployPanel";
 import FlowPanel from "./pages/FlowPanel";
+import SuggestPanel from "./pages/SuggestPanel";
 
 type View = { kind: "project"; id: number } | { kind: "flow" } | { kind: "worklog" } | { kind: "todos" } | { kind: "settings" };
 type Tab = "ops" | "code" | "deploy" | "prompt" | "todo" | "flow" | "suggest" | "config";
@@ -21,7 +22,7 @@ const TABS: { key: Tab; label: string; later?: string }[] = [
   { key: "prompt", label: "프롬프트" },
   { key: "todo", label: "남은 작업" },
   { key: "flow", label: "구조 흐름도" },
-  { key: "suggest", label: "개선 제안", later: "3단계" },
+  { key: "suggest", label: "개선 제안" },
   { key: "config", label: "프로젝트 설정" },
 ];
 
@@ -132,7 +133,7 @@ export default function App() {
               {tab === "prompt" && <PromptPanel key={current.id} project={current} hasApiKey={!!settings?.hasApiKey} onOpenInCode={openInCode} />}
               {tab === "todo" && <TodoPanel key={current.id} projectId={current.id} projects={projects} />}
               {tab === "flow" && <FlowPanel key={current.id} projectId={current.id} hasApiKey={!!settings?.hasApiKey} onOpen={openFile} />}
-              {tab === "suggest" && <div className="empty">개선 제안은 3단계에서 만듭니다.</div>}
+              {tab === "suggest" && <SuggestPanel key={current.id} project={current} hasApiKey={!!settings?.hasApiKey} onOpenInCode={openInCode} />}
               {tab === "config" && (
                 <ProjectSettings
                   key={current.id}

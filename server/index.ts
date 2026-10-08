@@ -13,6 +13,7 @@ import * as files from "./files.js";
 import * as deploy from "./deploy.js";
 import * as flow from "./flow.js";
 import * as predict from "./predict.js";
+import * as suggest from "./suggest.js";
 
 const PORT = Number(process.env.PORT ?? 4100);
 const HOST = process.env.HOST ?? "127.0.0.1"; // 내 PC에서만 접속
@@ -174,6 +175,15 @@ app.delete("/api/predictions/:id", async (req) => {
   predict.remove(id(req.params));
   return { ok: true };
 });
+
+// ---------- 개선 제안 ----------
+app.get("/api/projects/:id/suggestions", async (req) => suggest.list(projects.listProjects(), id(req.params)));
+app.post("/api/projects/:id/suggestions/analyze", async (req) => {
+  if (!ai.hasApiKey()) throw projects.httpError(400, "설정에서 Claude API 키를 먼저 입력해 주세요.");
+  const { group } = req.body as { group?: string };
+  return suggest.analyze(projects.listProjects(), id(req.params), group ?? "");
+});
+app.patch("/api/suggestions/:id", async (req) => suggest.setStatus(id(req.params), (req.body as { status: string }).status));
 
 // ---------- 프롬프트 ----------
 app.get("/api/projects/:id/prompts", async (req) =>

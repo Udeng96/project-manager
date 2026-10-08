@@ -182,3 +182,27 @@ export type PredictionItem = {
   pending: boolean;
   stale: boolean;
 };
+
+export type Suggestion = {
+  id: number;
+  project_id: number;
+  source: "static" | "claude";
+  group_name: string;
+  category: "tech" | "logic" | "performance" | "security" | "structure" | "ops";
+  title: string;
+  file: string;
+  line: number | null;
+  problem: string;
+  suggestion: string;
+  reason: string;
+  difficulty: "easy" | "normal" | "hard";
+  priority: "high" | "normal" | "low";
+  status: "open" | "ignored" | "todo";
+  created_at: string;
+};
+
+export type SuggestionList = {
+  items: Suggestion[];
+  groups: string[];
+  runs: { id: number; group_name: string; created_at: string; added: number; error: string | null }[];
+};
