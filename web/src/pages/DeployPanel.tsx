@@ -209,7 +209,12 @@ function FileView(props: { project: Project; file: DeployFile; configs: DeployFi
           <h3>서버에 올리기</h3>
           <p className="muted small">Tailscale 프로그램이 열리고 이 파일이 업로드 대상으로 잡힙니다. 실제 업로드는 그 프로그램에서 서버와 경로를 확인한 뒤 진행합니다.</p>
           <div className="row">
-            <input className="mono" placeholder="서버 (선택, 예: dashboard)" value={server} onChange={(e) => setServer(e.target.value)} />
+            <input className="mono" list="ts-servers" placeholder="서버 이름 (선택)" value={server} onChange={(e) => setServer(e.target.value)} />
+            {/* Tailscale 프로그램에 등록된 SSH 서버 이름 */}
+            <datalist id="ts-servers">
+              <option value="dashboard" />
+              <option value="nginx" />
+            </datalist>
             <input className="grow mono" placeholder="서버 경로 (선택, 예: /opt/broadcast)" value={remoteDir} onChange={(e) => setRemoteDir(e.target.value)} />
             <button className="btn primary" onClick={upload}>
               ↑ 서버에 올리기
