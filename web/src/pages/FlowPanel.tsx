@@ -15,6 +15,7 @@ import {
 import "@xyflow/react/dist/style.css";
 import dagre from "@dagrejs/dagre";
 import { api, fmtTime, type FlowGraph, type FlowKind, type FlowNode } from "../api";
+import PredictView from "./PredictView";
 
 export const KINDS: { key: FlowKind; label: string; color: string }[] = [
   { key: "screen", label: "화면", color: "#8b5cf6" },
@@ -30,28 +31,29 @@ export const KINDS: { key: FlowKind; label: string; color: string }[] = [
   { key: "external", label: "다른 서비스 · 외부", color: "#be185d" },
 ];
 const GROUP_KIND = { key: "group", label: "기능 묶음", color: "#334155" };
-const KIND = { ...Object.fromEntries(KINDS.map((k) => [k.key, k])), group: GROUP_KIND } as unknown as Record<FlowKind | "group", { label: string; color: string }>;
-type ViewNode = Omit<FlowNode, "kind"> & { kind: FlowKind | "group"; groupKey?: string; count?: number };
+export const KIND = { ...Object.fromEntries(KINDS.map((k) => [k.key, k])), group: GROUP_KIND } as unknown as Record<FlowKind | "group", { label: string; color: string }>;
+export type ViewNode = Omit<FlowNode, "kind"> & { kind: FlowKind | "group"; groupKey?: string; count?: number };
 
-const NODE_W = 250;
-const NODE_H = 68;
+export const NODE_W = 250;
+export const NODE_H = 68;
 
-type NodeData = {
+export type NodeData = {
   n: ViewNode;
   dim: boolean;
   selected: boolean;
   other: boolean; // 다른 프로젝트 노드 (프로젝트 화면에서)
   showProject: boolean;
   vertical: boolean; // 위→아래 배치
+  plan?: "new" | "changed" | "same"; // 예상 흐름도: 새로 생김 / 바뀜 / 그대로
 };
 
 const ClassNode = memo(function ClassNode({ data }: NodeProps<Node<NodeData>>) {
-  const { n, dim, selected, other, showProject, vertical } = data;
+  const { n, dim, selected, other, showProject, vertical, plan } = data;
   const k = KIND[n.kind];
   return (
     <div
-      className={"fnode" + (n.kind === "group" ? " group" : "") + (selected ? " sel" : "") + (other ? " other" : "") + (n.changed ? " changed" : "")}
-      style={{ borderLeftColor: k.color, opacity: dim ? 0.18 : 1 }}
+      className={"fnode" + (n.kind === "group" ? " group" : "") + (selected ? " sel" : "") + (other ? " other" : "") + (n.changed && !plan ? " changed" : "") + (plan ? ` st-${plan}` : "")}
+      style={{ borderLeftColor: k.color, opacity: dim ? 0.18 : plan === "same" ? 0.6 : 1 }}
       title={n.desc ?? n.label}
     >
       <Handle type="target" position={vertical ? Position.Top : Position.Left} />
@@ -62,7 +64,9 @@ const ClassNode = memo(function ClassNode({ data }: NodeProps<Node<NodeData>>) {
         </span>
         {(showProject || other) && n.projectId != null && <span className="fnode-proj">{n.project}</span>}
         {n.kind === "table" && n.schema && <span className="fnode-proj">{n.schema}</span>}
-        {n.changed && <span className="fnode-changed">수정됨</span>}
+        {n.changed && !plan && <span className="fnode-changed">수정됨</span>}
+        {plan === "new" && <span className="fnode-plan new">새로</span>}
+        {plan === "changed" && <span className="fnode-plan changed">변경</span>}
       </div>
       <div className="fnode-label">{n.label}</div>
       {n.desc && <div className="fnode-desc">{n.desc}</div>}
@@ -72,7 +76,7 @@ const ClassNode = memo(function ClassNode({ data }: NodeProps<Node<NodeData>>) {
   );
 });
 
-const nodeTypes = { cls: ClassNode };
+export const nodeTypes = { cls: ClassNode };
 
 /** 숨긴 종류의 노드는 빼고, 그 노드를 거쳐 가던 연결은 앞뒤를 바로 잇는다 */
 function collapse(g: FlowGraph, visible: (n: FlowNode) => boolean) {
@@ -98,7 +102,7 @@ function collapse(g: FlowGraph, visible: (n: FlowNode) => boolean) {
   return { nodes: g.nodes.filter((n) => keep.has(n.id)), edges: [...edges.entries()].map(([id, e]) => ({ id, ...e })) };
 }
 
-function layout(nodes: { id: string }[], edges: { source: string; target: string }[], vertical = false) {
+export function layout(nodes: { id: string }[], edges: { source: string; target: string }[], vertical = false) {
   const g = new dagre.graphlib.Graph();
   g.setGraph(
     vertical
@@ -154,7 +158,7 @@ function groupUp(g: { nodes: FlowNode[]; edges: { id: string; source: string; ta
 }
 
 /** 선택한 노드에서 앞(부르는 쪽)·뒤(불리는 쪽)로 이어진 노드 전부 */
-function chainOf(id: string, edges: { source: string; target: string }[]) {
+export function chainOf(id: string, edges: { source: string; target: string }[]) {
   const fwd = new Map<string, string[]>();
   const back = new Map<string, string[]>();
   for (const e of edges) {
@@ -213,7 +217,7 @@ function FlowInner({ projectId, hasApiKey, onOpen }: Props) {
   const [focusRoot, setFocusRoot] = useState<string | null>(null);
   const focus = !!focusRoot;
   const [grouped, setGrouped] = useState(projectId == null);
-  const [mode, setMode] = useState<"flow" | "all">("flow");
+  const [mode, setMode] = useState<"flow" | "all" | "predict">("flow");
   const flowMode = mode === "flow";
   const [describing, setDescribing] = useState("");
   const rf = useReactFlow();
@@ -299,7 +303,7 @@ function FlowInner({ projectId, hasApiKey, onOpen }: Props) {
 
   // 보이는 노드·연결
   const view = useMemo((): { nodes: ViewNode[]; edges: { id: string; source: string; target: string; label?: string; cross?: boolean }[] } | null => {
-    if (!graph) return null;
+    if (!graph || mode === "predict") return null;
     let g = collapse(graph, (n) => !hidden.has(n.kind));
     if (flowMode) {
       if (!focusRoot || !g.nodes.some((n) => n.id === focusRoot)) return { nodes: [], edges: [] };
@@ -323,7 +327,7 @@ function FlowInner({ projectId, hasApiKey, onOpen }: Props) {
     }
     return g;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [graph, hidden, group, focusRoot, grouped, flowMode]);
+  }, [graph, hidden, group, focusRoot, grouped, flowMode, mode]);
 
   // 선택 흐름은 위에서 아래로, 전체 보기는 왼쪽에서 오른쪽으로
   const positions = useMemo(() => (view ? layout(view.nodes, view.edges, flowMode) : new Map()), [view, flowMode]);
@@ -393,6 +397,7 @@ function FlowInner({ projectId, hasApiKey, onOpen }: Props) {
   }, [matches, rf]);
 
   useEffect(() => {
+    if (mode === "predict") return;
     const t = setTimeout(() => {
       const box = canvasRef.current;
       if (!flowMode || !box || !positions.size) return rf.fitView({ duration: 200, maxZoom: 1.3, padding: 0.06 });
@@ -413,7 +418,7 @@ function FlowInner({ projectId, hasApiKey, onOpen }: Props) {
     }, 50);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [view, positions, rf, flowMode]);
+  }, [view, positions, rf, flowMode, mode]);
 
   const sel = graph?.nodes.find((n) => n.id === selected) ?? null;
   const drill = (n: ViewNode) => {
@@ -464,7 +469,7 @@ function FlowInner({ projectId, hasApiKey, onOpen }: Props) {
             선택 흐름
           </button>
           <button
-            className={!flowMode ? "on" : ""}
+            className={mode === "all" ? "on" : ""}
             onClick={() => {
               setMode("all");
               setFocusRoot(null);
@@ -472,9 +477,14 @@ function FlowInner({ projectId, hasApiKey, onOpen }: Props) {
           >
             전체 보기
           </button>
+          {!all && (
+            <button className={mode === "predict" ? "on" : ""} onClick={() => setMode("predict")}>
+              기능 추가 예상
+            </button>
+          )}
         </div>
-        <input placeholder={flowMode ? "목록에서 찾기 (클래스 · 주소)" : "클래스 · 주소 · 파일 찾기"} value={q} onChange={(e) => setQ(e.target.value)} style={{ width: 220 }} />
-        {!flowMode && (
+        {mode !== "predict" && <input placeholder={flowMode ? "목록에서 찾기 (클래스 · 주소)" : "클래스 · 주소 · 파일 찾기"} value={q} onChange={(e) => setQ(e.target.value)} style={{ width: 220 }} />}
+        {mode === "all" && (
           <>
         <select value={group} onChange={(e) => setGroup(e.target.value)} disabled={grouped}>
           <option value="">{all ? "전체 프로젝트 · 기능" : "전체 기능"}</option>
@@ -504,7 +514,7 @@ function FlowInner({ projectId, hasApiKey, onOpen }: Props) {
           </>
         )}
         <span className="grow" />
-        {!all && (
+        {!all && mode !== "predict" && (
           <button className="btn small" onClick={describe} disabled={!hasApiKey || !!describing.endsWith("…")} title={hasApiKey ? "주석이 없는 항목에 Claude 가 한 줄 설명을 붙입니다" : "설정에서 API 키를 넣어 주세요"}>
             Claude 설명 채우기
           </button>
@@ -513,6 +523,9 @@ function FlowInner({ projectId, hasApiKey, onOpen }: Props) {
           {loading ? "분석 중…" : "다시 분석"}
         </button>
       </div>
+      {mode === "predict" && projectId != null && <PredictView projectId={projectId} hasApiKey={hasApiKey} onOpen={open} />}
+      {mode !== "predict" && (
+      <>
       <div className="flow-kinds">
         {KINDS.filter((k) => counts.get(k.key)).map((k) => (
           <button
@@ -617,6 +630,8 @@ function FlowInner({ projectId, hasApiKey, onOpen }: Props) {
           )}
         </aside>
       </div>
+      </>
+      )}
     </div>
   );
 }

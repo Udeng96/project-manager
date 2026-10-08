@@ -4,7 +4,7 @@ import path from "node:path";
 import { getSetting } from "./db.js";
 import { httpError } from "./projects.js";
 
-const MODEL = "claude-opus-5-5";
+export const MODEL = "claude-opus-5-5";
 
 /** API 오류를 사용자에게 보여줄 한국어 메시지로 바꾼다 */
 export function friendlyError(e: unknown): Error {
@@ -19,7 +19,7 @@ export function hasApiKey() {
   return !!(getSetting("anthropic_api_key") || process.env.ANTHROPIC_API_KEY);
 }
 
-function client() {
+export function client() {
   const apiKey = getSetting("anthropic_api_key") || process.env.ANTHROPIC_API_KEY;
   if (!apiKey) throw httpError(400, "Claude API 키가 없습니다. 설정 화면에서 입력해 주세요.");
   return new Anthropic({ apiKey });
@@ -53,7 +53,7 @@ export async function ask(system: string, user: string, effort: "low" | "medium"
 const IGNORE = new Set([".git", "node_modules", "build", "dist", "target", ".gradle", ".idea", "bin", "out", "logs", ".vscode"]);
 const MAX_FILE = 200 * 1024;
 
-function safeJoin(root: string, rel: string) {
+export function safeJoin(root: string, rel: string) {
   const abs = path.resolve(root, rel || ".");
   const r = path.relative(root, abs);
   if (r.startsWith("..") || path.isAbsolute(r)) throw new Error("프로젝트 폴더 밖은 볼 수 없습니다.");
@@ -86,7 +86,7 @@ export function fileTree(root: string, maxEntries = 400) {
   return out.join("\n");
 }
 
-function grep(root: string, pattern: string) {
+export function grep(root: string, pattern: string) {
   let re: RegExp;
   try {
     re = new RegExp(pattern, "i");

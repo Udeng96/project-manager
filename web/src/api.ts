@@ -161,3 +161,24 @@ export type FlowGraph = {
   unresolved: { projectId: number; project: string; file: string; url: string; reason: string }[];
   generatedAt: string;
 };
+
+export type Prediction = {
+  summary: string;
+  newNodes: { key: string; kind: string; project: string; label: string; group: string; desc: string; file: string; endpoints: string[] }[];
+  changedNodes: { id: string; change: string }[];
+  newEdges: { source: string; target: string; label: string }[];
+  tasks: { project: string; projectId: number; file: string; action: "add" | "modify"; detail: string }[];
+  risks: string[];
+  claudeCodePrompt: string;
+};
+
+export type PredictionItem = {
+  id: number;
+  projectId: number;
+  createdAt: string;
+  request: string;
+  result: Prediction | null;
+  error: string | null;
+  pending: boolean;
+  stale: boolean;
+};

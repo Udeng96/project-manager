@@ -12,6 +12,7 @@ import * as worklog from "./worklog.js";
 import * as files from "./files.js";
 import * as deploy from "./deploy.js";
 import * as flow from "./flow.js";
+import * as predict from "./predict.js";
 
 const PORT = Number(process.env.PORT ?? 4100);
 const HOST = process.env.HOST ?? "127.0.0.1"; // 내 PC에서만 접속
@@ -160,6 +161,18 @@ app.post("/api/projects/:id/flow/describe", async (req) => {
   } catch (e) {
     throw ai.friendlyError(e);
   }
+});
+
+// ---------- 기능 추가 예상 흐름도 ----------
+app.get("/api/projects/:id/predictions", async (req) => predict.list(projects.listProjects(), id(req.params)));
+app.post("/api/projects/:id/predictions", async (req) => {
+  if (!ai.hasApiKey()) throw projects.httpError(400, "설정에서 Claude API 키를 먼저 입력해 주세요.");
+  const { request } = req.body as { request: string };
+  return predict.create(projects.listProjects(), projects.getProject(id(req.params)), request ?? "");
+});
+app.delete("/api/predictions/:id", async (req) => {
+  predict.remove(id(req.params));
+  return { ok: true };
 });
 
 // ---------- 프롬프트 ----------
